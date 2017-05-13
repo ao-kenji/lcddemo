@@ -43,6 +43,7 @@ int lcd_fd;
 int wait = 5;	/* sec. */
 int ncpu;
 int physmem;
+char model[16];
 
 int
 main(int argc, char **argv)
@@ -50,6 +51,7 @@ main(int argc, char **argv)
 	char buf[80 + 1];
 	double la[3];
 	int mib[2];
+	char hw_model[120];
 	size_t len;
 
 	/* get number of cpu(s) */
@@ -60,12 +62,24 @@ main(int argc, char **argv)
 		perror("sysctl hw.ncpu failed");
 		exit(1);
 	}
+	/* get physical memory size */
 	mib[1] = HW_PHYSMEM;
 	len = sizeof(physmem);
 	if (sysctl(mib, 2, &physmem, &len, NULL, 0) == -1) {
 		perror("sysctl hw.physmem failed");
 		exit(1);
 	}
+	/* get model name */
+	mib[1] = HW_MODEL;
+	len = sizeof(hw_model);
+	if (sysctl(mib, 2, hw_model, &len, NULL, 0) == -1) {
+		perror("sysctl hw.model failed");
+		exit(1);
+	}
+	if (strncmp(hw_model, "OMRON LUNA-88K2", 15) == 0)
+		strlcpy(model, "LUNA-88K2", sizeof(model));
+	else
+		strlcpy(model, "LUNA-88K", sizeof(model));
 
 	/* open LCD device */
 	lcd_fd = open(LCD_DEVICE, O_RDWR);
@@ -99,7 +113,9 @@ main(int argc, char **argv)
 
 		/*	      0123456789012345678901234567890123456789 */
 		strlcpy(buf, "OpenBSD/luna88k                         ", 41);
-		strlcat(buf, "    on LUNA-88K2                        ", 81);
+		snprintf(&buf[40], 41,
+			     "    on %s                       ",
+			     model);
 		write(lcd_fd, buf, 80);
 
 		sleep(wait);
